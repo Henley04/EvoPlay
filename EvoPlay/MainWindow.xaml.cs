@@ -12,6 +12,7 @@ using Windows.Storage;
 using TagLib;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Windows.Media.Core;
+using Windows.Media.Playback;
 
 namespace EvoPlay
 {
@@ -29,7 +30,63 @@ namespace EvoPlay
             _timer = new DispatcherTimer();
             _timer.Interval = TimeSpan.FromMilliseconds(200);
             _timer.Tick += Timer_Tick;
+
+            // 订阅播放状态变化事件
+            Player.MediaPlayer.PlaybackSession.PlaybackStateChanged += PlaybackSession_PlaybackStateChanged;
+            Player.MediaPlayer.MediaEnded += PlayEnded;
         }
+        private void PlayEnded(MediaPlayer sender, object args)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                PlayPauseButton.Content = "播放";
+            });
+        }
+
+        // 播放状态变化事件处理
+        private void PlaybackSession_PlaybackStateChanged(Windows.Media.Playback.MediaPlaybackSession sender, object args)
+        {
+            //暂时弃用。
+            // 播放结束时，状态会变为 None 或 Stopped
+            if (sender.PlaybackState == Windows.Media.Playback.MediaPlaybackState.None)
+            {
+                // UI 线程更新
+                // 替换原有的 await DispatcherQueue.EnqueueAsync(() => { ... });
+                // DispatcherQueue 没有 EnqueueAsync 方法，需用 DispatcherQueue.TryEnqueue
+
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    PlayPauseButton.Content = "播放";
+                    _timer.Stop();
+                });
+                if (sender.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing)
+                {
+                    // UI 线程更新
+                    // 替换原有的 await DispatcherQueue.EnqueueAsync(() => { ... });
+                    // DispatcherQueue 没有 EnqueueAsync 方法，需用 DispatcherQueue.TryEnqueue
+
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        PlayPauseButton.Content = "暂停";
+                        _timer.Stop();
+                    });
+                }
+                if (sender.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Paused)
+                {
+                    // UI 线程更新
+                    // 替换原有的 await DispatcherQueue.EnqueueAsync(() => { ... });
+                    // DispatcherQueue 没有 EnqueueAsync 方法，需用 DispatcherQueue.TryEnqueue
+
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        PlayPauseButton.Content = "播放";
+                        _timer.Stop();
+                    });
+                }
+            }
+        }
+
+
 
         private async void SelectMusic_Click(object sender, RoutedEventArgs e)
         {
@@ -53,6 +110,7 @@ namespace EvoPlay
 
                 // 自动播放
                 Play_Click(null, null);
+                PlayPauseButton.Content = "暂停";
             }
         }
         private void PlayPause_Click(object sender, RoutedEventArgs e)
