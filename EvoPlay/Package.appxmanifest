@@ -5,7 +5,8 @@
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  xmlns:uap18="http://schemas.microsoft.com/appx/manifest/uap/windows10/18"
+  IgnorableNamespaces="uap rescap uap18">
 
   <Identity
     Name="e69804ee-327e-4e30-98d2-1fea8a28da3e"
@@ -17,7 +18,7 @@
   <Properties>
     <DisplayName>EvoPlay</DisplayName>
     <PublisherDisplayName>胖轩</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
+    <Logo>Assets/EvoPlay-1090.png</Logo>
   </Properties>
 
   <Dependencies>
@@ -37,10 +38,10 @@
         DisplayName="EvoPlay"
         Description="EvoPlay"
         BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
+        Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets/EvoPlay-1090.png">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
+        <uap:LockScreen BadgeLogo="Assets/EvoPlay-1090.png" Notification="badgeAndTileText"/>
       </uap:VisualElements>
     </Application>
   </Applications>
