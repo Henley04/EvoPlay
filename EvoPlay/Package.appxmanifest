@@ -10,8 +10,8 @@
 
   <Identity
     Name="e69804ee-327e-4e30-98d2-1fea8a28da3e"
-    Publisher="CN=胖轩"
-    Version="1.0.0.0" />
+    Publisher="CN=EvoSphere"
+    Version="1.0.2.0" />
 
   <mp:PhoneIdentity PhoneProductId="e69804ee-327e-4e30-98d2-1fea8a28da3e" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
