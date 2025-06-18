@@ -13,15 +13,47 @@ using TagLib;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Windows.Media.Core;
 using Windows.Media.Playback;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
 
 namespace EvoPlay
 {
-    public sealed partial class MainWindow : Window
+    public sealed partial class MainWindow : Window, INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
         private DispatcherTimer _timer;
         private string[] _lyricsLines;
         private double[] _lyricsTimes;
         private string _audioFilePath;
+        private double _lyricsFontSize = 28;
+        
+        // éŸ³ä¹åº“æ•°æ®
+        public ObservableCollection<MusicInfo> MusicLibrary { get; set; } = new ObservableCollection<MusicInfo>();
+        private int _currentLibraryIndex = -1;
+
+        // éŸ³ä¹åº“è·¯å¾„
+        private string _musicLibraryPath = "";
+
+        public double LyricsFontSize
+        {
+            get => _lyricsFontSize;
+            set
+            {
+                if (_lyricsFontSize != value)
+                {
+                    _lyricsFontSize = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         public MainWindow()
         {
@@ -31,55 +63,183 @@ namespace EvoPlay
             _timer.Interval = TimeSpan.FromMilliseconds(200);
             _timer.Tick += Timer_Tick;
 
-            // ¶©ÔÄ²¥·Å×´Ì¬±ä»¯ÊÂ¼ş
+            
             Player.MediaPlayer.PlaybackSession.PlaybackStateChanged += PlaybackSession_PlaybackStateChanged;
             Player.MediaPlayer.MediaEnded += PlayEnded;
+
+            // é»˜è®¤åŠ è½½éŸ³ä¹åº“
+            LoadMusicLibrary();
         }
+
+        // éŸ³ä¹ä¿¡æ¯ç±»
+        public class MusicInfo
+        {
+            public string FilePath { get; set; }
+            public string Name { get; set; }
+            public string Artist { get; set; }
+            public string Album { get; set; }
+        }
+
+        // è®¾ç½®æŒ‰é’®äº‹ä»¶
+        private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dlg = new SettingsDialog(_musicLibraryPath, LyricsFontSize);
+                dlg.XamlRoot = this.Content.XamlRoot; // å°†å¯¹è¯æ¡†çš„ XamlRoot ç»‘å®šåˆ°ä¸»çª—å£çš„ XamlRoot
+                var result = await dlg.ShowAsync();
+                if (result == ContentDialogResult.Primary)
+                {
+                    _musicLibraryPath = dlg.SelectedMusicLibraryPath;
+                    LyricsFontSize = dlg.SelectedLyricsFontSize;
+                    LyricsText.FontSize = LyricsFontSize;
+                    LoadMusicLibrary();
+                }
+            }
+            catch (Exception ex)
+            {
+                ContentDialog errorDialog = new ContentDialog
+                {
+                    Title = "é”™è¯¯",
+                    Content = ex.Message,
+                    CloseButtonText = "ç¡®å®š"
+                };
+                await errorDialog.ShowAsync();
+            }
+        }
+
+
+        // åŠ è½½éŸ³ä¹åº“
+        private void LoadMusicLibrary()
+        {
+            MusicLibrary.Clear();
+            string path = string.IsNullOrEmpty(_musicLibraryPath)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.MyMusic)
+                : _musicLibraryPath;
+            if (!Directory.Exists(path)) return;
+            var files = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories)
+                .Where(f => f.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
+                         || f.EndsWith(".flac", StringComparison.OrdinalIgnoreCase)
+                         || f.EndsWith(".wav", StringComparison.OrdinalIgnoreCase)
+                         || f.EndsWith(".m4a", StringComparison.OrdinalIgnoreCase));
+            foreach (var file in files)
+            {
+                try
+                {
+                    var tagFile = TagLib.File.Create(file);
+                    MusicLibrary.Add(new MusicInfo
+                    {
+                        FilePath = file,
+                        Name = tagFile.Tag.Title ?? Path.GetFileName(file),
+                        Artist = tagFile.Tag.FirstPerformer ?? "æœªçŸ¥è‰ºæœ¯å®¶",
+                        Album = tagFile.Tag.Album ?? "æœªçŸ¥ä¸“è¾‘"
+                    });
+                }
+                catch
+                {
+                    MusicLibrary.Add(new MusicInfo
+                    {
+                        FilePath = file,
+                        Name = Path.GetFileName(file),
+                        Artist = "é”™è¯¯",
+                        Album = "é”™è¯¯"
+                    });
+                }
+            }
+        }
+
+
+        // éŸ³ä¹åº“æ ç›®æ’­æ”¾æŒ‰é’®äº‹ä»¶
+        private void MusicItemPlay_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is MusicInfo info)
+            {
+                int idx = MusicLibrary.IndexOf(info);
+                if (idx >= 0)
+                {
+                    PlayMusicFromLibrary(idx);
+                }
+            }
+        }
+
+        // ä»æŒ‡å®šç´¢å¼•å¼€å§‹é¡ºåºæ’­æ”¾éŸ³ä¹åº“
+        private void PlayMusicFromLibrary(int startIndex)
+        {
+            if (startIndex < 0 || startIndex >= MusicLibrary.Count) return;
+            _currentLibraryIndex = startIndex;
+            PlayLibraryCurrent();
+        }
+
+        // æ’­æ”¾å½“å‰ç´¢å¼•éŸ³ä¹
+        private void PlayLibraryCurrent()
+        {
+            if (_currentLibraryIndex < 0 || _currentLibraryIndex >= MusicLibrary.Count) return;
+            var info = MusicLibrary[_currentLibraryIndex];
+            _audioFilePath = info.FilePath;
+            SongNameText.Text = info.Name;
+            LoadLyrics(_audioFilePath);
+            Player.Source = MediaSource.CreateFromUri(new Uri(_audioFilePath));
+            ProgressSlider.Value = 0;
+            CurrentTimeText.Text = "00:00";
+            Player.MediaPlayer.Play();
+            _timer.Start();
+            PlayPauseButton.Content = "æš‚åœ";
+        }
+
+        // æ’­æ”¾ç»“æŸè‡ªåŠ¨æ’­æ”¾ä¸‹ä¸€ä¸ª
         private void PlayEnded(MediaPlayer sender, object args)
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                PlayPauseButton.Content = "²¥·Å";
+                if (_currentLibraryIndex >= 0 && _currentLibraryIndex < MusicLibrary.Count - 1)
+                {
+                    _currentLibraryIndex++;
+                    PlayLibraryCurrent();
+                }
+                else
+                {
+                    PlayPauseButton.Content = "æ’­æ”¾";
+                }
             });
         }
 
-        // ²¥·Å×´Ì¬±ä»¯ÊÂ¼ş´¦Àí
+        // ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ä»¯ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½
         private void PlaybackSession_PlaybackStateChanged(Windows.Media.Playback.MediaPlaybackSession sender, object args)
         {
-            //ÔİÊ±ÆúÓÃ¡£
-            // ²¥·Å½áÊøÊ±£¬×´Ì¬»á±äÎª None »ò Stopped
+            //ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ã¡ï¿½
+            // ï¿½ï¿½ï¿½Å½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½Îª None ï¿½ï¿½ Stopped
             if (sender.PlaybackState == Windows.Media.Playback.MediaPlaybackState.None)
             {
-                // UI Ïß³Ì¸üĞÂ
-                // Ìæ»»Ô­ÓĞµÄ await DispatcherQueue.EnqueueAsync(() => { ... });
-                // DispatcherQueue Ã»ÓĞ EnqueueAsync ·½·¨£¬ĞèÓÃ DispatcherQueue.TryEnqueue
+                // UI ï¿½ß³Ì¸ï¿½ï¿½ï¿½
+                // ï¿½æ»»Ô­ï¿½Ğµï¿½ await DispatcherQueue.EnqueueAsync(() => { ... });
+                // DispatcherQueue Ã»ï¿½ï¿½ EnqueueAsync ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DispatcherQueue.TryEnqueue
 
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    PlayPauseButton.Content = "²¥·Å";
+                    PlayPauseButton.Content = "æ’­æ”¾";
                     _timer.Stop();
                 });
                 if (sender.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing)
                 {
-                    // UI Ïß³Ì¸üĞÂ
-                    // Ìæ»»Ô­ÓĞµÄ await DispatcherQueue.EnqueueAsync(() => { ... });
-                    // DispatcherQueue Ã»ÓĞ EnqueueAsync ·½·¨£¬ĞèÓÃ DispatcherQueue.TryEnqueue
+                    // UI ï¿½ß³Ì¸ï¿½ï¿½ï¿½
+                    // ï¿½æ»»Ô­ï¿½Ğµï¿½ await DispatcherQueue.EnqueueAsync(() => { ... });
+                    // DispatcherQueue Ã»ï¿½ï¿½ EnqueueAsync ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DispatcherQueue.TryEnqueue
 
                     DispatcherQueue.TryEnqueue(() =>
                     {
-                        PlayPauseButton.Content = "ÔİÍ£";
+                        PlayPauseButton.Content = "æš‚åœ";
                         _timer.Stop();
                     });
                 }
                 if (sender.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Paused)
                 {
-                    // UI Ïß³Ì¸üĞÂ
-                    // Ìæ»»Ô­ÓĞµÄ await DispatcherQueue.EnqueueAsync(() => { ... });
-                    // DispatcherQueue Ã»ÓĞ EnqueueAsync ·½·¨£¬ĞèÓÃ DispatcherQueue.TryEnqueue
+                    // UI ï¿½ß³Ì¸ï¿½ï¿½ï¿½
+                    // ï¿½æ»»Ô­ï¿½Ğµï¿½ await DispatcherQueue.EnqueueAsync(() => { ... });
+                    // DispatcherQueue Ã»ï¿½ï¿½ EnqueueAsync ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ DispatcherQueue.TryEnqueue
 
                     DispatcherQueue.TryEnqueue(() =>
                     {
-                        PlayPauseButton.Content = "²¥·Å";
+                        PlayPauseButton.Content = "æ’­æ”¾";
                         _timer.Stop();
                     });
                 }
@@ -108,9 +268,9 @@ namespace EvoPlay
                 ProgressSlider.Value = 0;
                 CurrentTimeText.Text = "00:00";
 
-                // ×Ô¶¯²¥·Å
+                // ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
                 Play_Click(null, null);
-                PlayPauseButton.Content = "ÔİÍ£";
+                PlayPauseButton.Content = "æš‚åœ";
             }
         }
         private void PlayPause_Click(object sender, RoutedEventArgs e)
@@ -119,7 +279,7 @@ namespace EvoPlay
             {
                 Player.MediaPlayer.Pause();
                 _timer.Stop();
-                PlayPauseButton.Content = "²¥·Å";
+                PlayPauseButton.Content = "æ’­æ”¾";
             }
             else
             {
@@ -127,7 +287,7 @@ namespace EvoPlay
                 {
                     Player.MediaPlayer.Play();
                     _timer.Start();
-                    PlayPauseButton.Content = "ÔİÍ£";
+                    PlayPauseButton.Content = "æš‚åœ";
                 }
             }
         }
@@ -176,7 +336,7 @@ namespace EvoPlay
                 var file = TagLib.File.Create(filePath);
                 var lyrics = file.Tag.Lyrics;
 
-                // ÓÅÏÈÄÚÇ¶¸è´Ê
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¶ï¿½ï¿½ï¿½
                 if (!string.IsNullOrWhiteSpace(lyrics))
                 {
                     if (IsLrcFormat(lyrics))
@@ -185,7 +345,7 @@ namespace EvoPlay
                     }
                     else
                     {
-                        // ·ÇLRC¸ñÊ½Ö±½ÓÏÔÊ¾
+                        // ï¿½ï¿½LRCï¿½ï¿½Ê½Ö±ï¿½ï¿½ï¿½ï¿½Ê¾
                         LyricsText.Text = lyrics;
                         _lyricsLines = null;
                         _lyricsTimes = null;
@@ -193,7 +353,7 @@ namespace EvoPlay
                     return;
                 }
 
-                // ²éÕÒÍ¬ÃûLRCÎÄ¼ş
+                // ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½LRCï¿½Ä¼ï¿½
                 var lrcPath = Path.ChangeExtension(filePath, ".lrc");
 
                 // Update the ambiguous reference to explicitly use System.IO.File
@@ -202,12 +362,12 @@ namespace EvoPlay
                     string lrcContent = null;
                     try
                     {
-                        // ÓÅÏÈ³¢ÊÔUTF-8
+                        // ï¿½ï¿½ï¿½È³ï¿½ï¿½ï¿½UTF-8
                         lrcContent = System.IO.File.ReadAllText(lrcPath, System.Text.Encoding.UTF8);
                     }
                     catch
                     {
-                        // ÈôUTF-8Ê§°Ü£¬³¢ÊÔGBK
+                        // ï¿½ï¿½UTF-8Ê§ï¿½Ü£ï¿½ï¿½ï¿½ï¿½ï¿½GBK
                         lrcContent = System.IO.File.ReadAllText(lrcPath, System.Text.Encoding.GetEncoding("GBK"));
                     }
 
@@ -219,26 +379,26 @@ namespace EvoPlay
                 }
 
 
-                // ¶¼Ã»ÓĞ¸è´Ê
-                LyricsText.Text = "Î´ÕÒµ½¸è´Ê";
+                // ï¿½ï¿½Ã»ï¿½Ğ¸ï¿½ï¿½
+                LyricsText.Text = "æœªæ‰¾åˆ°æ­Œè¯æ–‡ä»¶æˆ–å†…åµŒæ­Œè¯";
                 _lyricsLines = null;
                 _lyricsTimes = null;
             }
             catch (Exception ex)
             {
-                LyricsText.Text = "¸è´Ê¼ÓÔØÊ§°Ü";
-                System.Diagnostics.Debug.WriteLine("¸è´Ê¼ÓÔØÒì³£: " + ex.Message);
+                LyricsText.Text = "åŠ è½½é”™è¯¯";
+                System.Diagnostics.Debug.WriteLine("Error when loading lrc: " + ex.Message);
             }
         }
 
-        // ÅĞ¶ÏÊÇ·ñÎªLRC¸ñÊ½
+        // ï¿½Ğ¶ï¿½ï¿½Ç·ï¿½ÎªLRCï¿½ï¿½Ê½
         private bool IsLrcFormat(string lyrics)
         {
-            // ¼òµ¥ÅĞ¶Ï£ºÊÇ·ñ°üº¬ [mm:ss] ÕâÑùµÄÊ±¼ä±êÇ©
+            // ï¿½ï¿½ï¿½Ğ¶Ï£ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ [mm:ss] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ç©
             return lyrics.Contains("[") && lyrics.Contains("]");
         }
 
-        // ½âÎöLRC¸ñÊ½¸è´Ê
+        // ï¿½ï¿½ï¿½ï¿½LRCï¿½ï¿½Ê½ï¿½ï¿½ï¿½
         private void ParseLyrics(string lyrics)
         {
             var lines = lyrics.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -247,7 +407,7 @@ namespace EvoPlay
 
             foreach (var rawLine in lines)
             {
-                var line = rawLine.Trim(); // È¥³ıÇ°ºó¿Õ°×
+                var line = rawLine.Trim(); // È¥ï¿½ï¿½Ç°ï¿½ï¿½Õ°ï¿½
                 int idx = 0;
                 bool foundTag = false;
                 string lyricText = null;
@@ -259,7 +419,7 @@ namespace EvoPlay
                     {
                         var timeStr = line.Substring(idx + 1, endIdx - idx - 1);
                         TimeSpan ts;
-                        // Ö§³Ö [mm:ss], [mm:ss.ff], [hh:mm:ss], [mm:ss:fff]
+                        // Ö§ï¿½ï¿½ [mm:ss], [mm:ss.ff], [hh:mm:ss], [mm:ss:fff]
                         if (TimeSpan.TryParseExact(timeStr, @"mm\:ss\.ff", null, out ts) ||
                             TimeSpan.TryParseExact(timeStr, @"mm\:ss\.fff", null, out ts) ||
                             TimeSpan.TryParseExact(timeStr, @"mm\:ss", null, out ts) ||
@@ -277,7 +437,7 @@ namespace EvoPlay
                         break;
                     }
                 }
-                // ¼æÈİÃ»ÓĞÊ±¼ä±êÇ©µÄĞĞ
+                // ï¿½ï¿½ï¿½ï¿½Ã»ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ç©ï¿½ï¿½ï¿½ï¿½
                 if (!foundTag && !string.IsNullOrWhiteSpace(line))
                 {
                     timeList.Add(0);
@@ -287,9 +447,10 @@ namespace EvoPlay
             _lyricsTimes = timeList.ToArray();
             _lyricsLines = textList.ToArray();
 
-            System.Diagnostics.Debug.WriteLine($"¸è´Ê½âÎöÍê³É£¬ĞĞÊı£º{_lyricsLines.Length}");
+            System.Diagnostics.Debug.WriteLine($"ï¿½ï¿½Ê½ï¿½ï¿½ï¿½ï¿½ï¿½É£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½{_lyricsLines.Length}");
         }
 
+        // æ­Œè¯å­—å·åŒæ­¥
         private void UpdateLyrics(double currentSeconds)
         {
             if (_lyricsTimes == null || _lyricsLines == null) return;
@@ -298,6 +459,7 @@ namespace EvoPlay
                 if (currentSeconds >= _lyricsTimes[i])
                 {
                     LyricsText.Text = _lyricsLines[i];
+                    LyricsText.FontSize = LyricsFontSize;
                     return;
                 }
             }

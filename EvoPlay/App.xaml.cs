@@ -24,6 +24,7 @@ namespace EvoPlay
     /// <summary>
     /// Provides application-specific behavior to supplement the default Application class.
     /// </summary>
+    
     public partial class App : Application
     {
         /// <summary>

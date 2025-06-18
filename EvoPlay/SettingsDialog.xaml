@@ -1,0 +1,24 @@
+<ContentDialog
+    x:Class="EvoPlay.SettingsDialog"
+    Title="设置"
+    PrimaryButtonText="确定"
+    SecondaryButtonText="取消"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:EvoPlay">
+    <StackPanel Spacing="16">
+        <TextBlock Text="音乐库位置"/>
+        <StackPanel Orientation="Horizontal">
+            <TextBox x:Name="MusicLibraryPathBox" Width="300" Text="{x:Bind SelectedMusicLibraryPath, Mode=TwoWay}"/>
+            <Button Content="浏览" Click="BrowseMusicLibrary_Click" Margin="8,0,0,0"/>
+        </StackPanel>
+        <TextBlock Text="歌词字号"/>
+        <Slider x:Name="LyricsFontSizeSlider"
+                Minimum="12" Maximum="64"
+                Value="{x:Bind SelectedLyricsFontSize, Mode=TwoWay}"
+                Width="200"/>
+        <TextBlock Text="{x:Bind SelectedLyricsFontSize, Mode=OneWay}" Margin="0,0,0,0"/>
+
+    </StackPanel>
+    
+</ContentDialog>
