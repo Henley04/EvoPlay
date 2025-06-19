@@ -22,20 +22,20 @@ namespace EvoPlay
 
         private async void BrowseMusicLibrary_Click(object sender, RoutedEventArgs e)
         {
-            //var picker = new FolderPicker();
+            var picker = new FolderPicker();
 
             // 正确地将 FolderPicker 绑定到当前窗口  
-            //var window = App.Current; // 假设 App.MainWindow 是你的主窗口实例  
-            //var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            var window = App.MainWindow; // 假设 App.MainWindow 是你的主窗口实例  
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
 
-            //InitializeWithWindow.Initialize(picker, hwnd);
+            InitializeWithWindow.Initialize(picker, hwnd);
 
-            //picker.FileTypeFilter.Add("*");
-            //StorageFolder folder = await picker.PickSingleFolderAsync();
-            //if (folder != null)
+            picker.FileTypeFilter.Add("*");
+            StorageFolder folder = await picker.PickSingleFolderAsync();
+            if (folder != null)
             {
-                //SelectedMusicLibraryPath = folder.Path;
-                //MusicLibraryPathBox.Text = folder.Path;
+                SelectedMusicLibraryPath = folder.Path;
+                MusicLibraryPathBox.Text = folder.Path;
             }
         }
 
